@@ -1,10 +1,16 @@
 # import openai
 from openai import OpenAI, DefaultHttpxClient, OpenAIError
-from config import OPENAI_API_KEY, IO_API_KEY
 import re
 import logging
 import openai
 import asyncio
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+IO_API_KEY = os.getenv("IO_API_KEY")
 
 logger = logging.getLogger(__name__)
 

@@ -31,9 +31,15 @@ from database import (
     log_query,
     get_analytics_data,
 )
-from config import TELEGRAM_TOKEN, ADMIN_IDS
+from dotenv import load_dotenv
+import os
 from database import init_db
 import logging
+
+load_dotenv()
+
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+ADMIN_IDS = os.getenv("ADMIN_IDS")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
