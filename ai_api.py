@@ -119,8 +119,8 @@ async def check_description_sufficiency(
     backoff = 1.0
     for attempt in range(1, max_retries + 1):
         try:
-            response = clientIO.chat.completions.create(  # убрать или добавить IO для досутпа к chatgpt и китайской ИИ!
-                model="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",  # использовать модель gpt-4o или deepseek-ai/DeepSeek-R1-Distill-Llama-70B
+            response = client.chat.completions.create(  # убрать или добавить IO для досутпа к chatgpt и китайской ИИ!
+                model="gpt-4.1-mini",  # использовать модель gpt-4o или deepseek-ai/DeepSeek-R1-Distill-Llama-70B
                 messages=messages,
                 temperature=0,
                 stream=False,
@@ -172,8 +172,8 @@ async def get_keywords(description: str, max_retries: int = 3):
     backoff = 1.0
     for attempt in range(1, max_retries + 1):
         try:
-            response = clientIO.chat.completions.create(  # убрать или добавить IO для досутпа к chatgpt и китайской ИИ!
-                model="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",  # использовать модель gpt-4o или deepseek-ai/DeepSeek-R1-Distill-Llama-70B
+            response = client.chat.completions.create(  # убрать или добавить IO для досутпа к chatgpt и китайской ИИ!
+                model="gpt-4.1-mini",  # использовать модель gpt-4o или deepseek-ai/DeepSeek-R1-Distill-Llama-70B
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT_KEYWORDS},
                     {
@@ -237,8 +237,8 @@ async def analyze_parsed_results2(description, parsed_data, max_retries: int = 3
     backoff = 1.0
     for attempt in range(1, max_retries + 1):
         try:
-            response = clientIO.chat.completions.create(  # убрать или добавить IO для досутпа к chatgpt и китайской ИИ!
-                model="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",  # использовать модель gpt-4o или deepseek-ai/DeepSeek-R1-Distill-Llama-70B
+            response = client.chat.completions.create(  # убрать или добавить IO для досутпа к chatgpt и китайской ИИ!
+                model="gpt-4.1-mini",  # использовать модель gpt-4o или deepseek-ai/DeepSeek-R1-Distill-Llama-70B
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT_FINAL},
                     {
