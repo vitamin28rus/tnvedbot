@@ -33,13 +33,14 @@ from database import (
 )
 from dotenv import load_dotenv
 import os
+import ast
 from database import init_db
 import logging
 
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-ADMIN_IDS = os.getenv("ADMIN_IDS")
+ADMIN_IDS = ast.literal_eval(os.getenv("ADMIN_IDS", "set()"))
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
