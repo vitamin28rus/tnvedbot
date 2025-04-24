@@ -34,9 +34,9 @@ SYSTEM_PROMPT = """
 
 client = OpenAI(
     api_key=OPENAI_API_KEY,
-    http_client=DefaultHttpxClient(
-        proxy="http://aXhqcPR1:NumDnqiQ@192.177.45.85:62896",
-    ),
+    # http_client=DefaultHttpxClient(
+    #     proxy="http://aXhqcPR1:NumDnqiQ@192.177.45.85:62896",
+    # ),
 )
 
 clientIO = openai.OpenAI(
