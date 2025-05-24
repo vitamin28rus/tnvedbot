@@ -1,6 +1,7 @@
 import asyncio
 import html
 from aiogram import Bot, Dispatcher, types, F
+from playwright.async_api import async_playwright
 from aiogram.filters import CommandStart, Command
 from aiogram.types import (
     InlineKeyboardButton,
@@ -16,12 +17,10 @@ from ai_api import (
     analyze_parsed_results2,
 )
 from parser2 import (
-    get_customs_duty,
     parse_ifcg,
     parse_tnved_tree,
     fetch_tks_explanation,
     fetch_examples,
-    parse_tks_info,
     parse_tks_info2,
 )
 from database import (
@@ -51,6 +50,21 @@ dp = Dispatcher()
 user_context = {}
 
 cache_explanation = {}
+
+PLAYWRIGHT = None
+BROWSER = None
+
+
+# инициализация браузера
+async def init_browser():
+    global PLAYWRIGHT, BROWSER
+    PLAYWRIGHT = await async_playwright().start()
+    BROWSER = await PLAYWRIGHT.chromium.launch(headless=True)
+
+
+# закрытие браузера
+async def shutdown_browser():
+    await PLAYWRIGHT.stop()
 
 
 @dp.message(CommandStart())
@@ -231,16 +245,20 @@ async def show_duty(call: types.CallbackQuery):
         )
         return
 
+    try:
+        await call.answer()
+    except Exception:
+        pass
+
     wait_msg = await call.message.reply(
         "⏳ Пожалуйста, подождите..."
     )  # Показываем "Ждите"
-    duty = await parse_tks_info2(hs_code)
+    duty = await parse_tks_info2(BROWSER, hs_code)
     await wait_msg.edit_text(
         f"📌 *Код ТН ВЭД:* {hs_code}\n{duty}",
         parse_mode="Markdown",
     )
 
-    await call.answer()  # Убираем "часики" у кнопки
     log_query(call.from_user.id, "duty")
 
 
@@ -423,6 +441,7 @@ async def set_bot_commands(bot):
 
 async def main():
     init_db()  # инициализируем базу данных
+    await init_browser()  # инициализируем браузер
     await set_bot_commands(bot)
     try:
         # Пойдём в вечный polling
@@ -431,6 +450,7 @@ async def main():
         # Корректно завершаем в случае CTRL+C или перезагрузки
         pass
     finally:
+        await shutdown_browser()  # очищаем ресурсы
         await bot.session.close()  # закрываем сессию aiohttp внутри Bot
 
 

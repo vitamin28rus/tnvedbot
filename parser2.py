@@ -4,6 +4,7 @@ import logging
 import re
 import textwrap
 import socket
+import random
 from bs4 import BeautifulSoup
 from collections import defaultdict
 from playwright.async_api import (
@@ -132,7 +133,7 @@ async def parse_ifcg(keywords):
                     "examples": list(all_examples[code]),
                 }
             )
-        pprint(structured_data)
+        # pprint(structured_data)
         return structured_data
 
 
@@ -341,38 +342,31 @@ async def parse_tks_info(hs_code: str):
         return result
 
 
-async def parse_tks_info2(hs_code: str) -> str:
+async def parse_tks_info2(browser, hs_code: str) -> str:
     # 1. Проверка DNS — чтобы не ждать таймаут Playwright, если домен не резолвится
     try:
         socket.gethostbyname("www.tks.ru")
     except socket.gaierror:
         return "⚠️ Сервер не отвечает, попробуйте позже."
 
-    url = "https://www.tks.ru/db/tnved/tree/"
-    max_retries = 3
-    backoff = 1.0  # секунды
+    max_retries = 5
+    backoff = 2.0  # секунды
 
     for attempt in range(1, max_retries + 1):
+        context = await browser.new_context()
+        page = await context.new_page()
+        page.set_default_navigation_timeout(15_000)
+        page.set_default_timeout(10_000)
         try:
-            async with async_playwright() as pw:
-                browser = await pw.chromium.launch(headless=True)
-                page = await browser.new_page()
-                # 2. Навигация с более коротким ожиданием событий
-                await page.goto(url, wait_until="domcontentloaded", timeout=15_000)
-
-                # 3. Вводим код и ищем
-                await page.fill("#tnved-search__input", hs_code)
-                await page.click("#tnved-search__submit")
-
-                # 4. Ждём появление результата
-                await page.wait_for_selector(".tree-list__code", timeout=10_000)
-                await page.click(f".tree-list__code:text('{hs_code}')")
-                await page.wait_for_selector("#code_info", timeout=10_000)
-
-                # 5. Считываем HTML и закрываем браузер
-                content = await page.content()
-                await browser.close()
-
+            await page.goto(
+                "https://www.tks.ru/db/tnved/tree/", wait_until="domcontentloaded"
+            )
+            await page.fill("#tnved-search__input", hs_code)
+            await page.click("#tnved-search__submit")
+            await page.wait_for_selector(".tree-list__code", timeout=10_000)
+            await page.click(f".tree-list__code:text('{hs_code}')")
+            await page.wait_for_selector("#code_info", timeout=10_000)
+            content = await page.content()
             # 6. Парсим BeautifulSoup’ом
             soup = BeautifulSoup(content, "html.parser")
             info_sections = soup.select("#code_info .product-info__section")
@@ -392,18 +386,17 @@ async def parse_tks_info2(hs_code: str) -> str:
             return result
 
         except PlaywrightTimeoutError:
-            # 7. Таймауты обрабатываем отдельно
             if attempt == max_retries:
-                return "⚠️ Ошибка получения данных. Попробуйте снова немного позже."
-            await asyncio.sleep(backoff)
-            backoff *= 2
-
+                return "⚠️ Таймаут при получении данных."
         except Exception as e:
-            # 8. Логируем и повторяем попытку
             if attempt == max_retries:
                 return f"⚠️ Ошибка доступа: {e}"
-            await asyncio.sleep(backoff)
-            backoff *= 2
+        finally:
+            await page.close()
+            await context.close()
+
+        await asyncio.sleep(backoff + random.random() * 0.5)
+        backoff *= 2
 
     # На всякий случай
     return "⚠️ Не удалось получить данные. Попробуйте позже."
