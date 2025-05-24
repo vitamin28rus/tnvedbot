@@ -21,6 +21,7 @@ from parser2 import (
     parse_tnved_tree,
     fetch_tks_explanation,
     fetch_examples,
+    parse_tks_info,
     parse_tks_info2,
 )
 from database import (
@@ -253,7 +254,9 @@ async def show_duty(call: types.CallbackQuery):
     wait_msg = await call.message.reply(
         "⏳ Пожалуйста, подождите..."
     )  # Показываем "Ждите"
-    duty = await parse_tks_info2(BROWSER, hs_code)
+    duty = await parse_tks_info(hs_code)
+    # duty = await parse_tks_info2(BROWSER, hs_code)
+
     await wait_msg.edit_text(
         f"📌 *Код ТН ВЭД:* {hs_code}\n{duty}",
         parse_mode="Markdown",
@@ -441,7 +444,7 @@ async def set_bot_commands(bot):
 
 async def main():
     init_db()  # инициализируем базу данных
-    await init_browser()  # инициализируем браузер
+    # await init_browser()  # инициализируем браузер
     await set_bot_commands(bot)
     try:
         # Пойдём в вечный polling
@@ -450,7 +453,7 @@ async def main():
         # Корректно завершаем в случае CTRL+C или перезагрузки
         pass
     finally:
-        await shutdown_browser()  # очищаем ресурсы
+        # await shutdown_browser()  # очищаем ресурсы
         await bot.session.close()  # закрываем сессию aiohttp внутри Bot
 
 

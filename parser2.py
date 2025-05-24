@@ -296,50 +296,85 @@ async def fetch_examples(hs_code):
 
 
 async def parse_tks_info(hs_code: str):
-    async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=True)
-        page = await browser.new_page()
+    content = await fetch_tks_info(hs_code)
 
-        await page.goto("https://www.tks.ru/db/tnved/tree/")
+    soup = BeautifulSoup(content, "html.parser")
 
-        # Вводим код в поле
-        await page.fill("#tnved-search__input", hs_code)
+    # Парсим секции Импорт и Экспорт
+    info_sections = soup.select(".product-info__section")
+    result = ""
 
-        # Нажимаем кнопку поиска
-        await page.click("#tnved-search__submit")
+    for section in info_sections:
+        section_title = section.select_one(".product-info__section-title").text.strip()
+        result += f"\n*{section_title}*\n\n"
 
-        # Ждем загрузки результатов поиска
-        await page.wait_for_selector(".tree-list__code", timeout=10000)
+        for row in section.select("table.product-info__table tr"):
+            cols = row.find_all("td")
+            if len(cols) >= 2:
+                label = cols[0].text.strip()
+                value = cols[1].text.strip()
+                result += f"*{label}* {value}\n"
 
-        # Кликаем на нужный код
-        await page.click(f".tree-list__code:text('{hs_code}')")
+    return result
 
-        # Ждем загрузки окна с информацией
-        await page.wait_for_selector("#code_info")
-        content = await page.content()
 
-        await browser.close()
+async def fetch_tks_info(
+    hs_code: str, max_retries: int = 3, base_delay: float = 2.0
+) -> str:
+    """
+    Достаём HTML блока с подробностями по коду через AJAX POST,
+    с рефором и CSRF-токеном и с retry при сбоях.
+    """
+    base_url = "https://www.tks.ru/db/tnved/tree/"
+    info_url = base_url + "info/"
 
-        soup = BeautifulSoup(content, "html.parser")
+    timeout = aiohttp.ClientTimeout(total=30)
+    for attempt in range(1, max_retries + 1):
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                # 1) GET, чтобы получить csrftoken в куках
+                async with session.get(base_url) as resp_get:
+                    resp_get.raise_for_status()
+                    # вытаскиваем токен из куки
+                    csrf_token = session.cookie_jar.filter_cookies(base_url)[
+                        "csrftoken"
+                    ].value
 
-        # Парсим секции Импорт и Экспорт
-        info_sections = soup.select("#code_info .product-info__section")
-        result = ""
+                # 2) Заголовки и form-data
+                headers = {
+                    "Referer": base_url,
+                    "X-CSRFToken": csrf_token,
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                }
+                data = {
+                    "code": hs_code,
+                    "csrfmiddlewaretoken": csrf_token,
+                }
 
-        for section in info_sections:
-            section_title = section.select_one(
-                ".product-info__section-title"
-            ).text.strip()
-            result += f"\n*{section_title}*\n\n"
+                # 3) POST запроса
+                async with session.post(
+                    info_url, data=data, headers=headers
+                ) as resp_post:
+                    resp_post.raise_for_status()  # бросит ClientResponseError, если код !=200
+                    result = await resp_post.text()
+                    return result
 
-            for row in section.select("table.product-info__table tr"):
-                cols = row.find_all("td")
-                if len(cols) >= 2:
-                    label = cols[0].text.strip()
-                    value = cols[1].text.strip()
-                    result += f"*{label}* {value}\n"
+        except (aiohttp.ClientConnectorError, aiohttp.ClientResponseError) as e:
+            # сетевые ошибки или HTTP != 2xx
+            if attempt == max_retries:
+                raise RuntimeError(f"Не удалось получить данные: {e}") from e
+            # логировать можно так:
+            print(f"[TKS] Попытка {attempt}/{max_retries} не удалась: {e}")
+        except Exception as e:
+            # любые другие ошибки
+            if attempt == max_retries:
+                raise RuntimeError(f"Ошибка при запросе TKS: {e}") from e
+            print(f"[TKS] Непредвиденная ошибка, retry {attempt}: {e}")
 
-        return result
+        # ожидание перед следующей попыткой: экспоненциальный бэкофф + jitter
+        delay = base_delay * (2 ** (attempt - 1)) + random.uniform(0, 0.5)
+        await asyncio.sleep(delay)
 
 
 async def parse_tks_info2(browser, hs_code: str) -> str:
